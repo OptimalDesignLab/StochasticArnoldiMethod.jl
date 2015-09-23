@@ -14,8 +14,14 @@ export trust
     itbnd = 50
     lambda = 0
     n = length(g)
-    coeff(1:n,1) = zeros(n,1)
-    # H = full(H)
+    # Matlab:
+    #   coeff(1:n,1) = zeros(n,1)
+    # TODO: fix
+#     coeff[1:n,1] = zeros(n,1)
+
+    # Matlab:
+    #   H = full(H)
+    # not needed in Julia?
 
     count = 0
 
@@ -55,7 +61,7 @@ export trust
     else
       laminit = -mineig
       posdef = 0
-    end
+    end   # end of 'if mineig > 0'
 
     if key == 0
       if seceqn(laminit,eigval,alpha,delta) > 0
@@ -94,17 +100,17 @@ export trust
         else
           lambda = -mineig
           key = 3
-        end
+        end   # end of 'if vval <= tol2'
       else
         lambda = -mineig
         key = 4
-      end
+      end   # end of 'if seceqn... > 0'
       lam = lambda*ones(n,1)
       if (key > 2)
         arg = abs(eigval + lam) < 10 * eps * max(abs(eigval),1)
         #TODO verify this arg business
         alpha(arg) = 0
-      end
+      end   # end of 'if key > 2'
       w = eigval + lam
       #TODO another conditional and logical AND
       # Matlab:
@@ -155,11 +161,9 @@ export trust
         coeff[isnan(coeff)] = 0
         s = V*coeff
         nrms = norm(s)
-      end
+      end   # end of 'if (key > 2) && (nrms > 1.2*delta)'
+    end   # end of 'if key == 0'
 
-
-
-    end
 
     val = g'*s + (0.5*s)' * (H*s)
 
@@ -167,7 +171,7 @@ export trust
 
   
 
-  end
+  end   # end of function trust
 
   #--------------------------------------------------------------------
   # Secular equation
@@ -214,7 +218,7 @@ export trust
 
     itfun = 0
 
-    if x ~= 0
+    if x != 0
       dx = abs(x)/2
     else
       dx = 1/2
@@ -260,77 +264,78 @@ export trust
     while fb != 0
       # Ensure that b is the best result so far, a is the previous
       # value of b, and c is on the opposite of the zero from b
-    if (fb > 0) == (fc > 0)
-      c = a
-      fc = fa
-      d = b - a
-      e = d
-    end
-    if abs(fc) < abs(fb)
-      a = b
-      b = c
-      c = a
-      fa = fb
-      fb = fc
-      fc = fa
-    end
-    
-    # Convergence test and possible exit
-    if itfun > itbnd
-      break
-    end
-    m = 0.5*(c - b)
-    toler = 2.0*tol*max(abs(b),1.0)
-    if (abs(m) <= toler) || (fb == 0.0)
-      break
-    end
-
-    # Choose bisection or interpolation
-    if (abs(e) < toler) || (abs(fa) <= abs(fb))
-      # Bisection
-      d = m
-      e = m
-    else
-      # Interpolation
-      s = fb/fa
-      if (a == c)
-        # Linear interpolation
-        p = 2.0*m*s
-        q = 1.0 - s
-      else
-        # Inverse quadratic interpolation
-        q = fa/fc
-        r = fb/fc
-        p = s*(2.0*m*q*(q - r) - (b - a)*(r - 1.0))
-        q = (q - 1.0)*(r - 1.0)*(s - 1.0)
-      end
-      if p > 0
-        q = -q
-      else
-        p = -p
-      end
-      # Is interpolated point acceptable
-      if (2.0*p < 3.0*m*q - abs(toler*q)) && (p < abs(0.5*e*q))
+      if (fb > 0) == (fc > 0)
+        c = a
+        fc = fa
+        d = b - a
         e = d
-        d = p/q
-      else
+      end
+      if abs(fc) < abs(fb)
+        a = b
+        b = c
+        c = a
+        fa = fb
+        fb = fc
+        fc = fa
+      end
+      
+      # Convergence test and possible exit
+      if itfun > itbnd
+        break
+      end
+      m = 0.5*(c - b)
+      toler = 2.0*tol*max(abs(b),1.0)
+      if (abs(m) <= toler) || (fb == 0.0)
+        break
+      end
+  
+      # Choose bisection or interpolation
+      if (abs(e) < toler) || (abs(fa) <= abs(fb))
+        # Bisection
         d = m
         e = m
+      else
+        # Interpolation
+        s = fb/fa
+        if (a == c)
+          # Linear interpolation
+          p = 2.0*m*s
+          q = 1.0 - s
+        else
+          # Inverse quadratic interpolation
+          q = fa/fc
+          r = fb/fc
+          p = s*(2.0*m*q*(q - r) - (b - a)*(r - 1.0))
+          q = (q - 1.0)*(r - 1.0)*(s - 1.0)
+        end
+        if p > 0
+          q = -q
+        else
+          p = -p
+        end
+        # Is interpolated point acceptable
+        if (2.0*p < 3.0*m*q - abs(toler*q)) && (p < abs(0.5*e*q))
+          e = d
+          d = p/q
+        else
+          d = m
+          e = m
+        end
+      end # Interpolation
+  
+      # Next point
+      a = b
+      fa = fb
+      if abs(d) > toler
+        b = b + d
+      elseif b > c 
+        b = b - toler
+      else 
+        b = b + toler
       end
-    end # Interpolation
-
-    # Next point
-    a = b
-    fa = fb
-    if abs(d) > toler
-      b = b + d
-    elseif b > c 
-      b = b - toler
-    else 
-      b = b + toler
-    end
-    seqeqn(b, eigval, alpha, delta)
-    itfun = itfun + 1
+      seqeqn(b, eigval, alpha, delta)
+      itfun = itfun + 1
+    end   # end of while loop
 
   end   # end of function rfzero
 
