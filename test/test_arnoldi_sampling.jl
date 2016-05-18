@@ -36,7 +36,7 @@ facts("Testing StochasticArnoldiMethod Module (arnoldi_sampling.jl file)...") do
     @fact lin_depend --> true
   end
 
-  context("Testing arnoldiSampling (positive definite quadratic)") do
+  context("Testing arnoldiSample (positive definite quadratic)") do
     # use a synthetic quadratic function, and check that arnoldiSample recovers
     # its eigenvalues and eigenvectors
     n = 10
@@ -70,12 +70,12 @@ facts("Testing StochasticArnoldiMethod Module (arnoldi_sampling.jl file)...") do
     
     # check that eigenvalues and eigenvectors agree
     for i = 1:n
-      @fact eigenvals[i] --> roughly(E[i], atol=sqrt(eps(1.0)))
-      @fact abs(dot(eigenvecs[:,i],V[:,i])) --> roughly(1.0, atol=sqrt(eps(1.0)))
+      @fact eigenvals[i] --> roughly(E[i], atol=1e-7)
+      @fact abs(dot(eigenvecs[:,i],V[:,i])) --> roughly(1.0, atol=1e-7)
     end
   end
 
-  context("Testing arnoldiSampling (semi-definite quadratic)") do
+  context("Testing arnoldiSample (semi-definite quadratic)") do
     # use a synthetic quadratic function, and check that arnoldiSample recovers
     # its eigenvalues and eigenvectors
     n = 10
@@ -111,10 +111,42 @@ facts("Testing StochasticArnoldiMethod Module (arnoldi_sampling.jl file)...") do
     
     # check that eigenvalues and eigenvectors agree
     for i = 1:dim
-      @fact eigenvals[i] --> roughly(E[i+1], atol=sqrt(eps(1.0)))
+      @fact eigenvals[i] --> roughly(E[i+1], atol=1e-7)
       @fact abs(dot(eigenvecs[:,i],V[:,i+1])) --> 
-      roughly(1.0, atol=sqrt(eps(1.0)))
+      roughly(1.0, atol=1e-7)
     end
+  end
+
+  context("Testing arnoldiSample (reduced gradient)") do
+    # use a nonlinear function and a small perturbation to test the reduced
+    # gradient produced by arnoldiSample
+    n = 10
+    function nonlinear(x::AbstractArray, f::AbstractArray, g::AbstractArray)
+      xs = x./[1:n;]
+      f[1] = exp(dot(xs,xs))
+      for i = 1:n
+        g[i] = 2.0*x[i]*f[1]./(i*i)
+      end
+    end
+    
+    # generate data at initial point (1,1,1,...,1)^T
+    xdata = zeros(n,n+1); fdata = zeros(1,n+1); gdata = zeros(n,n+1)
+    xdata[:,1] = ones(n)
+    nonlinear(view(xdata,:,1), view(fdata,:,1), view(gdata,:,1))
+
+    # generate sample
+    alpha = sqrt(eps(1.0))
+    num_sample = n+1
+    eigenvals = zeros(n)
+    eigenvecs = zeros(n,n)
+    grad_red = zeros(n)
+    dim = arnoldiSample(nonlinear, xdata, fdata, gdata, alpha, num_sample,
+                        eigenvals, eigenvecs, grad_red)
+
+    # check reduced gradient;
+    # rotate back out of eigenvector coordinates
+    g = eigenvecs*grad_red
+    @fact g --> roughly(gdata[:,1], atol=1e-6)
   end
 
 end

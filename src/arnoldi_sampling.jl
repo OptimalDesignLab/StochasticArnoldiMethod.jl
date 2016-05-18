@@ -73,7 +73,7 @@ function arnoldiSample(func::Function, xdata, fdata, gdata, alpha, num_sample,
 
   # generate the directional-derivative approximation to the reduced gradient
   tmp = (fdata[1,2:i+1].' - ones(i,1)*fdata[1,1])./alpha
-  gred = eigvecs_red[1:i,1:i].'*tmp
+  grad_red[1:i] = eigvecs_red[1:i,1:i].'*tmp
 
   return i
 end
