@@ -3,7 +3,7 @@ module StochasticArnoldiMethod
 
 using ArrayViews
 
-export arnoldiSample, default_options, SAMHistory
+export arnoldiSample, trust, secular, default_options, SAMHistory
 
 @doc """
 StochasticArnoldiMethod.default_options
