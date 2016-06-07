@@ -1,14 +1,14 @@
 @doc """
 ### StochasticArnoldiMethod.arnoldiSample
 
-Generates a sample of points, function values, and gradients using arnoldi
+Generates a sample of points, function values, and gradients using Arnoldi
 sampling.  Also returns a quadratic model based on the sampled gradients.
 
 **Inputs**
 
 * `func`: functor that returns function and gradient information
 * `alpha`: pertubation size used to generate samples
-* `num_sample`: number of samples (number of Arnoldi iterations + 1)
+* `num_sample`: maximum number of samples (number of Arnoldi iterations + 1)
 
 **In/Outs**
 
@@ -120,15 +120,15 @@ function modGramSchmidt(i, Hsbg, w)
     error(err_msg)
     return false
   elseif nrm != nrm
-    # this is intended to catch if nrm = NaN, but some optimizations may mess it
-    # up (according to posts on stackoverflow.com)
+    # this is intended to catch if nrm = NaN, but some compiler optimizations
+    # may mess it up
     err_msg *= "w[i+1] = NaN"
     error(err_msg)
     return false
   end
 
   if i < 1
-    # just normalize and exit
+    # only one vector, so just normalize and exit
     w[:,i+1] /= sqrt(nrm)
     return false
   end
