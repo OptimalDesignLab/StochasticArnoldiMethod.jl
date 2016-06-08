@@ -26,8 +26,8 @@ facts("Testing StochasticArnoldiMethod Module (sam.jl file)...") do
     x, f, hist = SAM(quad, x0, tol, options)
     #println("norm(x) = ",norm(x))
     #println("f = ",f)
-    @fact norm(x) --> roughly(0.0, atol=1e-6)
-    @fact f --> roughly(0.0, atol=1e-12)
+    @fact norm(x) --> roughly(0.0, atol=1e-3)
+    @fact f --> roughly(0.0, atol=1e-8)
   end
 
   context("Testing SAM (positive-definite quadratic with error)") do
