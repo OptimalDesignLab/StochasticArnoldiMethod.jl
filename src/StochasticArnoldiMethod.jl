@@ -3,7 +3,12 @@ module StochasticArnoldiMethod
 
 using ArrayViews
 
-export arnoldiSample, trust, secular, default_options, SAMHistory
+export SAM
+export arnoldiSample
+export trust
+export secular
+export default_options
+export SAMHistory
 
 @doc """
 StochasticArnoldiMethod.default_options
@@ -20,6 +25,10 @@ StochasticArnoldiMethod.default_options
 * `init_radius`: initial trust-region radius (defalut = 1.0)
 * `truth`: if true, the user function can be evaluated exactly for testing
            (default = false)
+* `display_level`: indicates how much information to display to stout
+                   0: only errors are dislayed (default)
+                   1: major iteration information
+                   2: major and minor iteration information
 
 """->
 default_options =
@@ -30,8 +39,9 @@ default_options =
                         "max_iter"=>10,
                         "max_radius"=>10.0,
                         "min_radius"=>1e-4,
-                        "init_raidus"=>1.0,
-                        "truth"=>false
+                        "init_radius"=>1.0,
+                        "truth"=>false,
+                        "display_level"=>0
                         )   
 @doc """
 StochasticArnoldiMethod.SAMHistory
@@ -73,6 +83,6 @@ end
 
 include("arnoldi_sampling.jl")
 include("trust.jl")
-#include("sam.jl")
+include("sam.jl")
 
 end

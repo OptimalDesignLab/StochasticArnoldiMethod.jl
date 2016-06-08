@@ -1,23 +1,24 @@
 @doc """
-### StochasticArnoldiMethod.sam
+### StochasticArnoldiMethod.SAM
 
 The Stochastic Arnoldi Method (SAM) approximately minimizes functions that may
 have inaccurate data
 
 **Inputs**
 
-* `func`: function to be minimized; functor for function and gradient information
+* `func`: function to be minimized; provides function and gradient information
 * `x0`: the initial design
 * `tol`: the tolerance target
 * `options` (optional): dictionary of options
 
 **Returns**
 
-* `x`: approximate local minimizer 
+* `x`: approximate local minimizer
+* `f`: objective function at `x`
 * `hist`: history data structure
 
 """->
-function sam(func::Function, x0, tol,
+function SAM(func::Function, x0, tol,
              options::Dict{ASCIIString,Any}=default_options)
   merge(default_options, options)
   checkSAMOptions(options)
@@ -27,6 +28,8 @@ function sam(func::Function, x0, tol,
            "tol should be a positive number greater than eps" )
 
   # create arrays to store sampled data, and sample at x0
+  n = size(x0,1)
+  x = deepcopy(x0)
   xdata = zeros(n, options["num_sample"])
   fdata = zeros(1, options["num_sample"])
   gdata = zeros(n, options["num_sample"])
@@ -36,53 +39,97 @@ function sam(func::Function, x0, tol,
   # generate Arnoldi sample
   m = options["num_sample"]-1
   eigenvals = zeros(m)
-  eigenvecs = zeros(m,m)
+  eigenvecs = zeros(n,m)
   grad_red = zeros(m)
   sample_size = arnoldiSample(func, xdata, fdata, gdata, options["alpha"],
                               options["num_sample"], eigenvals, eigenvecs,
                               grad_red)
 
-  # initialize history data structure  
-  hist = SAMHistory(func, sample_size+1, fdata[1,1], norm(gdata[:,1]),
-                    options["truth"])
+  # initialize history data structure
+  hist = SAMHistory(func, sample_size, fdata[1,1], norm(gdata[:,1]),
+                    exact=options["truth"])
 
   # start outer, nonlinear iterations
   radius = options["init_radius"]
+  local grad_norm0::Float64
+  dg_sum = 0.0
   for k = 1:options["max_iter"]
     
     # check for convergence and display convergence
     if options["grad_method"] == "average"
-      grad_norm = norm(mean(gdata,2))
+      grad_norm = norm(gdata[:,1]) #norm(mean(gdata[:,1:sample_size+1],2))
     elseif options["grad_method"] == "dirderiv"
       grad_norm = norm(grad_red)
     end
     if k == 1
       grad_norm0 = grad_norm
     end
-    if options["display"]
-      println("iter = ",k,": rel. grad norm = ",grad_norm/grad_norm0)
-      println("\tradius = ",radius)
+    if options["display_level"] > 0
+      @printf("\niter = %d: obj = %g: optimality = %g: radius = %g\n",
+              k-1, fdata[1,1], grad_norm/grad_norm0, radius)
+
+      # estimate the noise level
+      #gmean = mean(gdata[:,1:sample_size+1],2)
+      #dg = gdata[:,1:sample_size+1] - gmean*ones(1,sample_size+1)
+      #dg_sum += sum(dg.*dg)
+      #gstd = sqrt(sum(sum(dg.*dg))./(n*sample_size))
+      #println("\n\testimate of gradient error = ",sqrt(dg_sum./(n*hist.func_count[end])))
+      #println("\n\tsmallest eigenvalue = ",minimum(eigenvals[1:sample_size]))
+
     end
     if (grad_norm < grad_norm0*tol)
       break
     end
 
+    B = diagm(eigenvals[1:sample_size])
+    local trust_active::Bool
+    local pred::Float64
     if options["grad_method"] == "average"
       # use gradient averaging for the reduced gradient
-      [dx_red, pred, pos_def] = trust(V.'*mean(gdata,2), diag(L), radius)
-      dx = V*dx_red
-      pred = -pred
-      #pred = -mean(gdata,2).'*V*dx_red - 0.5*dx_red.'*diag(L)*dx_red
-      x = mean(xdata,2) + dx
+      g = vec(eigenvecs[:,1:sample_size].'*mean(gdata[:,1:sample_size+1],2))
+      p, pred, trust_active = trust(g, B, radius, display_level=
+                                    options["display_level"])
+      x = mean(xdata[:,1:sample_size+1],2) + eigenvecs[:,1:sample_size]*p
     elseif options["grad_method"] == "dirderiv"
       # use the directional-derivative for the reduced gradient
-      [dx_red, pred, pos_def] = trust(gred, diag(L), radius)
-      dx = V*dx_red
-      pred = -pred
-      #pred = -gred.'*dx_red - 0.5*dx_red.'*diag(L)*dx_red
-      x = xdata(:,1) + dx
+      g = grad_red
+      p, pred, trust_active = trust(g, B, radius, display_level=
+                                    options["display_level"])
+      x = xdata[:,1] + eigenvecs[:,1:sample_size]*p
     end
-  
+
+    # evaluate at new point, and globalize if necessary
+    f_new = zeros((1,1))
+    g_new = zeros((n,1))
+    func(x, view(f_new,:,1), view(g_new,:,1))
+    ared = fdata[1,1] - f_new[1,1]
+    rho = ared/pred
+    if options["display_level"] > 0 
+      @printf("\tpred = %g: ared = %g: rho = %g\n", pred, ared, rho)
+    end
+    if rho < eps()
+      radius = max(0.25*radius, options["min_radius"])
+    else
+      if rho > 0.75 && rho < 1.25 && trust_active
+        radius = min(2.*radius, options["max_radius"])
+      end
+    end
+    if rho > eps()
+      # some reduction, so keep the new solution
+      xdata[:,1] = x[:]
+      fdata[1,1] = f_new[1,1]
+      gdata[:,1] = g_new[:,1]
+    end
+    
+    # run Arnoldi sampling, update history and output
+    sample_size = arnoldiSample(func, xdata, fdata, gdata, options["alpha"],
+                                options["num_sample"], eigenvals, eigenvecs,
+                                grad_red)
+    updateSAMHistory(func, sample_size, fdata[1,1], norm(gdata[:,1]), hist,
+                     exact=options["truth"])
+  end
+  x = xdata[:,1]
+  return x, fdata[1,1], hist
 end
 
 @doc """
@@ -114,10 +161,12 @@ function checkSAMOptions(options::Dict{ASCIIString,Any})
            "option max_radius should greater than option min_radius" )
   @assert( options["init_radius"] >= eps(1.0),
            "option init_radius should be a positive number greater than eps" )
-  @assert( options["init_radus"] >= options["min_radius"] &&
+  @assert( options["init_radius"] >= options["min_radius"] &&
            options["init_radius"] <= options["max_radius"],
            "option init_radius should be between min_radius and max_radius" )
-
+  @assert( options["display_level"] >= 0 &&
+           options["display_level"] <= 2,
+           "option display_level must be 0, 1, or 2" )
 end
 
 @doc """
@@ -127,6 +176,7 @@ Updates the fields in the given SAMHistory datatype
 
 **Inputs**
 
+* `func`: function to be minimized; provides function and gradient information
 * `count`: number of function evaluations used in most recent iteration
 * `val`: current estimate of the function value
 * `grad`: current estimate of the gradient norm
@@ -136,134 +186,18 @@ Updates the fields in the given SAMHistory datatype
 * `hist`: SAMHistory convergence history datatype
 
 """->
-function updateSAMHistory(count::Int, val::Float64, grad::Float64,   
-                          hist::SAMHistory)
+function updateSAMHistory(func::Function, count::Int, val::Float64,
+                          grad::Float64, hist::SAMHistory; exact::Bool=false)
   push!(hist.func_count, hist.func_count[end] + count)
-  push!(hist.func_val, val)
-  push!(hist.grad_norm, grad)
-end
-
-function SAM(fun, x0, hess_rank, num_sample, tol, variant)
-  #TODO: need to pass function somehow
-
-  if (variant < 0) || (variant > 1)
-    error("variant option must be 0 or 1")
+  if exact
+    # use exact values for the history, if available, for testing
+    temp_val = zeros(1,1)
+    temp_grad = zeros(n,1)
+    func(view(xdata,:,1), temp_val, temp_grad, exact=exact)
+    push!(hist.func_val, temp_val[1,1])
+    push!(hist.grad_norm, temp_grad[:,1])
+  else
+    push!(hist.func_val, val)
+    push!(hist.grad_norm, grad)
   end
-
-  n = size(x0, 1)
-  MaxIter = 10
-  radius = norm(x0)
-  max_radius = 10.0*radius
-  min_radius = 0.0001;
-  model_radius = 0.5
-  x = x0
-
-  # Initial samples
-  xdata = zeros(n, num_sample)
-  fdata = zeros(1, num_sample)
-  gdata = zeros(n, num_sample)
-  xdata[:,1] = zeros(n,1)
-  (fdata[1,1], gdata[:,1]) = fun(x)
-
-  # Estimate the Hessian
-  [xdata, fdata, gdata, V, L, new_rank, gred] =
-    ApproxArnoldi(fun, x, fdata[1,1], gdata[:,1], 
-                  model_radius, hess_rank, num_sample - 1)
-
-  hist = Dict()
-  hist["fnccount"] = zeros(MaxIter+1,1)
-  hist["fval"] = zeros(MaxIter+1,1)
-  hist["norm"] = zeros(MaxIter+1,1)
-  hist["norm0"] = 0.0
-  hist["iters"] = 0
-
-  hist["fnccount"][1] = num_sample
-  (hist["fval"][1], gex) = fun(x, 'no_noise')
-
-  # start outer iterations
-  for k = 1:MaxIter
-
-    # check for convergence
-    if variant == 0
-      grad_norm = norm(mean(gdata,2))
-    elseif variant == 1
-      grad_norm = norm(gred)
-    end
-    hist["norm"][k] = grad_norm
-    if k == 1
-      grad_norm0 = grad_norm
-      hist["norm0"] = grad_norm0
-    end
-    if (mod(k,1) == 0)
-      println("iter = ", k,": rel grad norm = ", grad_norm/grad_norm0)
-      println("  radius = ", radius)
-    end
-    if (grad_norm < grad_norm0*tol)
-      break
-    end
-    hist["iters"] = k+1
-
-    xold = x
-
-    if variant == 0
-
-      # step-averaging (used for CSE 2015)
-      # TODO: check this diag(L)
-      (dx_red, pred, pos_def) = trust(V.' * mean(gdata,2), diag(L), radius)
-      dx = V*dx_red
-      pred = -pred
-      # line 71 in SAM.m not put in here
-      x = mean(xdata,2) + dx
-    elseif variant == 1
-      # directional derivative
-      (dx_red, pred, pos_def) = trust(gred, diag(L), radius)
-      dx = V*dx_red
-      pred = -pred
-      # line 78 in SAM.m not put in here
-      x = xdata[:,1] + dx
-    end
-    
-    (f, g) = fun(x)
-    ared = fdata[1,1] - f
-    rho = ared/pred
-    # rho = 1.0 # TEMP: no globalization
-    println("  pred = ", pred, ": ared = ", ared, ": rho = ", rho)
-    if rho < 1e-3
-      radius = 0.25*radius 
-      # radius = max(0.25*radius, min_radius)
-    else
-      if ( (rho > 0.75) && (abs(norm(dx) - radius) < 1e-4) )
-        radius = min(2*radius, max_radius)
-      end
-    end
-    count = 0
-    if (rho > 1e-4)
-      # keep new solution
-      fdata[1,1] = f
-      gdata[:,1] = g
-    else
-      # revert
-      x = xold
-      (f, g) = fun(x)
-      fdata[1,1] = f
-      gdata[:,1] = g
-      count = 1
-    end
-    
-    # estimate eigenvectors of Hessian
-    [xdata, fdata, gdata, V, L, new_rank, gred] = 
-        ApproxArnoldi(fun, x, fdata(1,1), gdata(:,1), model_radius, 
-          hess_rank, num_sample-1)
-
-    hist["fnccount"][k+1] = hist["fnccount"][k] + num_sample-1 + count
-    (hist["fval"][k+1], gex) = fun(x, 'no_noise')   # need to evaluate w/o noise
-  end
-
-
-
-
-
-
-  return x, hist
-
 end

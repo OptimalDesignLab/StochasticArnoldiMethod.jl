@@ -61,9 +61,10 @@ function arnoldiSample(func::Function, xdata, fdata, gdata, alpha, num_sample,
   end
 
   # symmetrize the Hessenberg matrix, and find its eigendecomposition
-  Hsym = Symmetric(0.5.*(H[1:i,1:i] + H[1:i,1:i]))
+  Hsym = Symmetric(0.5.*(H[1:i,1:i] + H[1:i,1:i].'))
   fill!(eigenvals, 0.0)
   eigenvals[1:i], eigvecs_red = eig(Hsym)
+  #println("Symmetry error = ",norm(0.5.*(H[1:i,1:i] - H[1:i,1:i].')))
 
   # generate the full-space eigenvector approximations
   fill!(eigenvecs, 0.0)
