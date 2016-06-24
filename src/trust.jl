@@ -1,4 +1,4 @@
-@doc """
+"""
 ### StochasticArnoldiMethod.trust
 
 Solves a trust-region constrained quadratic optimization problem; suitable for
@@ -16,7 +16,7 @@ relatively small problems with explicit (dense) Hessians.
 * `pred`: the predicted reduction in the objective
 * `active`: true if the trust-region constraint is active, false otherwise
 
-"""->
+"""
 function trust(g::Array{Float64,1}, B::Array{Float64,2}, Δ::Float64;
                display_level::Int=0)
   @assert( norm(B - B.') < 100.*eps(), "B must be a symmetric matrix")
@@ -135,7 +135,7 @@ function trust(g::Array{Float64,1}, B::Array{Float64,2}, Δ::Float64;
   return p, pred, true
 end
 
-@doc """
+"""
 ### StochasticArnoldiMethod.secular
 
 Computes the secular function for trust-region optimization
@@ -153,7 +153,7 @@ Computes the secular function for trust-region optimization
 * `f`: the value of the secular function
 * `df`: derivative of `f` with respect to `λ`
 
-"""->
+"""
 function secular(g::Array{Float64,1}, B::Array{Float64,2}, λ::Float64,
                  Δ::Float64; display_level::Int=0)
   @assert( norm(B - B.') < 100.*eps(), "B must be a symmetric matrix")

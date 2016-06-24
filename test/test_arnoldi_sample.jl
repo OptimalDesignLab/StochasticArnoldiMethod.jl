@@ -105,8 +105,9 @@ facts("Testing StochasticArnoldiMethod Module (arnoldi_sampling.jl file)...") do
     eigenvals = zeros(n)
     eigenvecs = zeros(n,n)
     grad_red = zeros(n)
-    dim = arnoldiSample(quad, xdata, fdata, gdata, alpha, num_sample,
-                        eigenvals, eigenvecs, grad_red)
+    dim, err_est = arnoldiSample(quad, xdata, fdata, gdata, alpha, num_sample,
+                                 eigenvals, eigenvecs, grad_red)
+    @fact err_est --> roughly(0.0, atol=sqrt(eps()))
     @fact dim --> n-1
     
     # check that eigenvalues and eigenvectors agree
@@ -140,8 +141,8 @@ facts("Testing StochasticArnoldiMethod Module (arnoldi_sampling.jl file)...") do
     eigenvals = zeros(n)
     eigenvecs = zeros(n,n)
     grad_red = zeros(n)
-    dim = arnoldiSample(nonlinear, xdata, fdata, gdata, alpha, num_sample,
-                        eigenvals, eigenvecs, grad_red)
+    dim, err_est = arnoldiSample(nonlinear, xdata, fdata, gdata, alpha,
+                                 num_sample, eigenvals, eigenvecs, grad_red)
 
     # check reduced gradient;
     # rotate back out of eigenvector coordinates

@@ -31,7 +31,7 @@ facts("Testing StochasticArnoldiMethod Module (sam.jl file)...") do
   end
 
   context("Testing SAM (positive-definite quadratic with error)") do
-    n = 100
+    n = 500
     V, R = qr(rand(n,n))
     E = sort(rand(n))
     func_std = 0.0
@@ -62,7 +62,7 @@ facts("Testing StochasticArnoldiMethod Module (sam.jl file)...") do
     println("grad_std = ",grad_std)
     tol = 1e-6
     options = default_options
-    options["display_level"] = 1
+    options["display_level"] = 0 #1
     options["alpha"] = 1.0
     options["max_iter"] = 20
     options["num_sample"] = 20

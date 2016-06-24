@@ -1,4 +1,4 @@
-@doc """
+"""
 ### StochasticArnoldiMethod.arnoldiSample
 
 Generates a sample of points, function values, and gradients using Arnoldi
@@ -15,6 +15,7 @@ sampling.  Also returns a quadratic model based on the sampled gradients.
 * `xdata`: array of sampled locations; on entry, xdata[:,1] is initial sample
 * `fdata`: array of sampled function values; fdata[:,1] is the initial function
 * `gdata`: array of sampled gradient values; gdata[:,1] is the initial gradient
+* `returnV` (optional): returns the Arnoldi vectors
 
 **Outputs**
 
@@ -25,10 +26,12 @@ sampling.  Also returns a quadratic model based on the sampled gradients.
 **Returns**
 
 * the size of the subspace; this may not equal num_sample-1
+* an error estimate for the Hessian-vector product
+* if 
 
-"""->
+"""
 function arnoldiSample(func::Function, xdata, fdata, gdata, alpha, num_sample,
-                       eigenvals, eigenvecs, grad_red)
+                       eigenvals, eigenvecs, grad_red; returnV::Bool=false)
   n = size(xdata,1)
   m = num_sample-1
   @assert(size(gdata,1) == size(eigenvecs,1) == n)
@@ -64,7 +67,7 @@ function arnoldiSample(func::Function, xdata, fdata, gdata, alpha, num_sample,
   Hsym = Symmetric(0.5.*(H[1:i,1:i] + H[1:i,1:i].'))
   fill!(eigenvals, 0.0)
   eigenvals[1:i], eigvecs_red = eig(Hsym)
-  #println("Symmetry error = ",norm(0.5.*(H[1:i,1:i] - H[1:i,1:i].')))
+  err_est = norm(0.5*(H[1:i,1:i] - H[1:i,1:i].'))
 
   # generate the full-space eigenvector approximations
   fill!(eigenvecs, 0.0)
@@ -76,10 +79,14 @@ function arnoldiSample(func::Function, xdata, fdata, gdata, alpha, num_sample,
   tmp = (fdata[1,2:i+1].' - ones(i,1)*fdata[1,1])./alpha
   grad_red[1:i] = eigvecs_red[1:i,1:i].'*tmp
 
-  return i
+  if returnV
+    return i, err_est, V
+  else
+    return i, err_est
+  end
 end
 
-@doc """
+"""
 ### StochasticArnoldiMethod.modGramSchmidt
 
 Performs modified Gram-Schmidt on the i+1 column of w, with respect to the
@@ -99,7 +106,7 @@ on Kesheng John Wu's mgsro subroutine in Saad's SPARSKIT.
 
 * `True` if the vector `w[:,i+1]` is linearly dependent, `False` otherwise
 
-"""->
+"""
 function modGramSchmidt(i, Hsbg, w)
   @assert(size(w,2) >= i+1)
   @assert(size(Hsbg,1) >= i+1)

@@ -1,4 +1,4 @@
-@doc """
+"""
 ### StochasticArnoldiMethod.SAM
 
 The Stochastic Arnoldi Method (SAM) approximately minimizes functions that may
@@ -17,7 +17,7 @@ have inaccurate data
 * `f`: objective function at `x`
 * `hist`: history data structure
 
-"""->
+"""
 function SAM(func::Function, x0, tol,
              options::Dict{ASCIIString,Any}=default_options)
   merge(default_options, options)
@@ -41,9 +41,10 @@ function SAM(func::Function, x0, tol,
   eigenvals = zeros(m)
   eigenvecs = zeros(n,m)
   grad_red = zeros(m)
-  sample_size = arnoldiSample(func, xdata, fdata, gdata, options["alpha"],
-                              options["num_sample"], eigenvals, eigenvecs,
-                              grad_red)
+  alpha = options["alpha"]
+  sample_size, err_est = arnoldiSample(func, xdata, fdata, gdata, alpha,
+                                       options["num_sample"], eigenvals,
+                                       eigenvecs, grad_red)
 
   # initialize history data structure
   hist = SAMHistory(func, sample_size, fdata[1,1], norm(gdata[:,1]),
@@ -122,7 +123,7 @@ function SAM(func::Function, x0, tol,
     end
     
     # run Arnoldi sampling, update history and output
-    sample_size = arnoldiSample(func, xdata, fdata, gdata, options["alpha"],
+    sample_size, err_est = arnoldiSample(func, xdata, fdata, gdata, alpha,
                                 options["num_sample"], eigenvals, eigenvecs,
                                 grad_red)
     updateSAMHistory(func, sample_size, fdata[1,1], norm(gdata[:,1]), hist,
@@ -132,7 +133,7 @@ function SAM(func::Function, x0, tol,
   return x, fdata[1,1], hist
 end
 
-@doc """
+"""
 ### StochasticArnoldiMethod.checkOptions
 
 Check the SAM option values in the given dictionary.  Throws an assertion error
@@ -142,7 +143,7 @@ if any of the options are invalid.
 
 * `options`: the options dictionary to be checked.
 
-"""->
+"""
 function checkSAMOptions(options::Dict{ASCIIString,Any})
   @assert( options["alpha"] >= eps(1.0),
            "option alpha should be a positive number greater than eps" )
@@ -169,7 +170,7 @@ function checkSAMOptions(options::Dict{ASCIIString,Any})
            "option display_level must be 0, 1, or 2" )
 end
 
-@doc """
+"""
 ### StochasticArnoldiMethod.updateSAMHistory
 
 Updates the fields in the given SAMHistory datatype
@@ -185,7 +186,7 @@ Updates the fields in the given SAMHistory datatype
 
 * `hist`: SAMHistory convergence history datatype
 
-"""->
+"""
 function updateSAMHistory(func::Function, count::Int, val::Float64,
                           grad::Float64, hist::SAMHistory; exact::Bool=false)
   push!(hist.func_count, hist.func_count[end] + count)
@@ -201,3 +202,4 @@ function updateSAMHistory(func::Function, count::Int, val::Float64,
     push!(hist.grad_norm, grad)
   end
 end
+

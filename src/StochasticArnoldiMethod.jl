@@ -10,12 +10,12 @@ export secular
 export default_options
 export SAMHistory
 
-@doc """
+"""
 StochasticArnoldiMethod.default_options
 
 **Options**
 
-* `alpha`: step size used in Arnoldi sampling (default = 1e-2)
+* `alpha`: initial guess for step size used in Arnoldi sampling (default = 1e-2)
 * `num_sample`: maximum number of samples in Arnoldi (default = 10)
 * `grad_method`: gradient approximation method, \"average\" or \"dirderiv\"
                  (default = \"average\")
@@ -30,7 +30,7 @@ StochasticArnoldiMethod.default_options
                    1: major iteration information
                    2: major and minor iteration information
 
-"""->
+"""
 default_options =
   Dict{ASCIIString,Any}(
                         "alpha"=>1e-2,
@@ -43,21 +43,18 @@ default_options =
                         "truth"=>false,
                         "display_level"=>0
                         )   
-@doc """
+
+"""
 StochasticArnoldiMethod.SAMHistory
 
 Type to record the convergence history of SAM
-
-**Fields**
-
-* `func_count`: cumulative number of calls to the user function at each iteration
-* `func_val`: function value at each iteration
-* `grad_norm`: estimated gradient norm at each iteration
-
-"""->
+"""
 type SAMHistory
+  """cumulative number of calls to the user function at each iteration"""
   func_count::Array{Int,1}
+  """function value at each iteration"""
   func_val::Array{Float64,1}
+  """estimated gradient norm at each iteration"""
   grad_norm::Array{Float64,1}
 
   function SAMHistory(func::Function, count::Int, val::Float64, grad::Float64;
@@ -81,7 +78,7 @@ type SAMHistory
   end
 end
 
-include("arnoldi_sampling.jl")
+include("arnoldi_sample.jl")
 include("trust.jl")
 include("sam.jl")
 
